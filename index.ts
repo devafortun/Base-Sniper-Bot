@@ -12,6 +12,8 @@ import {
   DEADLINE,
 } from "./config";
 
+//Firstly it calls the getTokens function and fetches the Token0 and Token1 token contracts. And then set tokenFrom and tokenTo tokens and tokenFromContract to call functions on tokenFrom token.
+
 // Wait for the getTokens function to resolve
 const { Token0, Token1 } = await getTokens();
 
@@ -23,6 +25,8 @@ if (!Token0 || !Token1) {
 const tokenFrom = Token0; // WETH (or any other token) as the input token
 const tokenFromContract = Token0.contract; // The contract instance of the input token
 const tokenTo = Token1.token; // USDC (or any other token) as the output token
+
+//Then we check if we have passed the argument in the terminal while running the bot. This means that if we have not passed the amount of WETH we want to swap with then throw error. Then we are checking if we have enough amount of the TokenFrom token or not. It must be grater than the passed argument in the terminal.
 
 if (typeof process.argv[2] === "undefined") {
   throw new Error(`Pass in the amount of ${tokenFrom.symbol} to swap.`);
@@ -37,6 +41,8 @@ if (!(await Token0.walletHas(signer, amountIn))) {
     `Not enough ${tokenFrom.symbol}. Needs ${amountIn}, but balance is ${balance}.`
   );
 }
+
+//We are using AlphaRouter here from Uniswap to swap tokens on Uniswap efficiently. Then we use this router object to create a route which takes the specific details of our swap. If no route is found then it throws error.
 
 const router = new AlphaRouter({ chainId: CHAIN_ID, provider: provider });
 const route = await router.route(
@@ -60,6 +66,8 @@ console.log(
     tokenTo.decimals
   )} ${tokenTo.symbol}.`
 );
+
+//Then we check the allowance. We are just defining here buildSwapTransaction and then also using swapTransaction to populate the buildSwapTransaction. Then we have also defined attemptSwapTransaction which sends the transaction to the network.
 
 const allowance: BigNumber = await tokenFromContract.allowance(
   walletAddress,
@@ -104,3 +112,25 @@ const attemptSwapTransaction = async (
     });
   });
 };
+
+//Here we finally call the before defined functions. Firstly we check if there is enough WETH allowance. And if there is not then we send an approve transaction to the network with the AmountIn amount of WETH. Then we call the attemptSwapTransaction which des the actual swap.
+
+if (allowance.lt(amountIn)) {
+  console.log(`Requesting ${tokenFrom.symbol} approval...`);
+
+  const approvalTx = await tokenFromContract
+    .connect(signer)
+    .approve(
+      SWAP_ROUTER_ADDRESS,
+      ethers.utils.parseUnits(amountIn.mul(1000).toString(), 18)
+    );
+
+  approvalTx.wait(3).then(() => {
+    attemptSwapTransaction(signer, swapTransaction);
+  });
+} else {
+  console.log(
+    `Sufficient ${tokenFrom.symbol} allowance, no need for approval.`
+  );
+  attemptSwapTransaction(signer, swapTransaction);
+}
