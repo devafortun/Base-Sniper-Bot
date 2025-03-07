@@ -60,3 +60,47 @@ console.log(
     tokenTo.decimals
   )} ${tokenTo.symbol}.`
 );
+
+const allowance: BigNumber = await tokenFromContract.allowance(
+  walletAddress,
+  SWAP_ROUTER_ADDRESS
+);
+
+const buildSwapTransaction = (
+  walletAddress: string,
+  routerAddress: string,
+  route: SwapRoute
+): TransactionRequest => {
+  return {
+    data: route.methodParameters?.calldata,
+    to: routerAddress,
+    from: walletAddress,
+    value: BigNumber.from(route.methodParameters?.value),
+    gasLimit: BigNumber.from("2000000"), //Set your desired gas limit here
+    // Optionally, you can specify gasPrice here if needed
+    // gasPrice: YOUR_GAS_PRICE_IN_WEI
+  };
+};
+
+const swapTransaction = buildSwapTransaction(
+  walletAddress,
+  SWAP_ROUTER_ADDRESS,
+  route
+);
+
+const attemptSwapTransaction = async (
+  signer: ethers.Wallet,
+  transation: TransactionRequest
+) => {
+  const signerBalance = await signer.getBalance();
+
+  if (!signerBalance.gte(transation.gasLimit || "0")) {
+    throw new Error(`Not enough ETH to cover gas: ${transation.gasLimit}`);
+  }
+
+  signer.sendTransaction(transation).then((tx) => {
+    tx.wait().then((receipt) => {
+      console.log("Completed swap transaction:", receipt.transactionHash);
+    });
+  });
+};
