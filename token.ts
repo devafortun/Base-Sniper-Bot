@@ -1,6 +1,6 @@
 import { Token } from "@uniswap/sdk-core";
 import { Signer, BigNumber, BigNumberish, Contract, providers } from "ethers";
-import { CHAIN_ID } from "./config";
+import { CHAIN_ID } from "./config.js";
 import { Provider } from "@ethersproject/providers";
 import axios, { AxiosRequestConfig } from "axios";
 import { config as loadEnvironmentVariables } from "dotenv";
