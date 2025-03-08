@@ -4,8 +4,6 @@ import { CHAIN_ID } from "./config";
 import { Provider } from "@ethersproject/providers";
 import axios, { AxiosRequestConfig } from "axios";
 import { config as loadEnvironmentVariables } from "dotenv";
-import { Network } from "inspector/promises";
-import { time } from "console";
 
 loadEnvironmentVariables(); // Load environment variables from .env file
 
@@ -17,8 +15,6 @@ const ERC20_ABI = [
   "function approve(address, uint) external returns(bool)",
   "function balanceOf(address) external view returns(uint256)",
 ];
-
-//We are going to need Token Contract to call different functions like balanceOf, decimals and symbol. So we are building Token Contract using buildERC20TokenWithContract function by providing the token address and the provider.
 
 type TokenWithContract = {
   contract: Contract;
@@ -60,8 +56,6 @@ const buildERC20TokenWithContract = async (
     return null;
   }
 };
-
-//Setting provider and type of Tokens here as we are using Typescript. Then we built a function getTokens which makes an API call and gets the address of Tokens 0 and 1 in the latest created liquidity pool. This function finally returns the Token Contract for the fetched Token 0 and Token 1 addresses using buildERC20TokenWithContract. Keep in mind we have set the Token 0 address as WETH token address. In the index.ts file we are going to swap this WETH with the other token i.e token 1 in the pool.
 
 //Example usage for BASE
 const provider = new providers.JsonRpcBatchProvider(process.env.RPC);
