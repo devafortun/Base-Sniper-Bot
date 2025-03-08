@@ -11,7 +11,6 @@ import {
   SLIPPAGE_TOLERANCE,
   DEADLINE,
 } from "./config";
-import { main } from "ts-node/dist/bin";
 
 //Firstly it calls the getTokens function and fetches the Token0 and Token1 token contracts. And then set tokenFrom and tokenTo tokens and tokenFromContract to call functions on tokenFrom token.
 
@@ -135,8 +134,3 @@ if (allowance.lt(amountIn)) {
   );
   attemptSwapTransaction(signer, swapTransaction);
 }
-
-main().catch((error) => {
-  console.error(error);
-  process.exitCode(1);
-});
