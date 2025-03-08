@@ -2,7 +2,7 @@ import { BigNumber, ethers } from "ethers";
 import { AlphaRouter, SwapType, SwapRoute } from "@uniswap/smart-order-router";
 import { CurrencyAmount, TradeType } from "@uniswap/sdk-core";
 import type { TransactionRequest } from "@ethersproject/abstract-provider";
-import { getTokens } from "./token.js";
+import { getTokens } from "./token";
 import {
   provider,
   signer,
@@ -10,145 +10,133 @@ import {
   SWAP_ROUTER_ADDRESS,
   SLIPPAGE_TOLERANCE,
   DEADLINE,
-} from "./config.js";
+} from "./config";
+import { main } from "ts-node/dist/bin";
 
-// Create an async main function to wrap everything
-async function main() {
-  console.log("🔍 Looking for the newest WETH pool...");
-  
-  // Wait for the getTokens function to resolve
-  const { Token0, Token1 } = await getTokens();
+//Firstly it calls the getTokens function and fetches the Token0 and Token1 token contracts. And then set tokenFrom and tokenTo tokens and tokenFromContract to call functions on tokenFrom token.
 
-  // Ensure tokens are not null
-  if (!Token0 || !Token1) {
-    throw new Error("Tokens are not initialized");
-  }
+// Wait for the getTokens function to resolve
+const { Token0, Token1 } = await getTokens();
 
-  console.log(`✅ Found pool with tokens:
-  - Token0 (WETH): ${Token0.token.symbol} (${Token0.token.address})
-  - Token1: ${Token1.token.symbol} (${Token1.token.address})`);
-
-  const tokenFrom = Token0; // WETH (or any other token) as the input token
-  const tokenFromContract = Token0.contract; // The contract instance of the input token
-  const tokenTo = Token1.token; // USDC (or any other token) as the output token
-
-  if (typeof process.argv[2] === "undefined") {
-    throw new Error(`Pass in the amount of ${tokenFrom.token.symbol} to swap.`);
-  }
-
-  const walletAddress = await signer.getAddress();
-  console.log(`👛 Using wallet: ${walletAddress}`);
-  
-  const amountIn = ethers.utils.parseUnits(process.argv[2], tokenFrom.token.decimals);
-  console.log(`💰 Amount to swap: ${process.argv[2]} ${tokenFrom.token.symbol}`);
-  
-  const balance = await tokenFromContract.balanceOf(walletAddress);
-  console.log(`💼 Current balance: ${ethers.utils.formatUnits(balance, tokenFrom.token.decimals)} ${tokenFrom.token.symbol}`);
-
-  if (!(await Token0.walletHas(signer, amountIn))) {
-    throw new Error(
-      `Not enough ${tokenFrom.token.symbol}. Needs ${ethers.utils.formatUnits(amountIn, tokenFrom.token.decimals)}, but balance is ${ethers.utils.formatUnits(balance, tokenFrom.token.decimals)}.`
-    );
-  }
-
-  console.log("🔄 Finding best swap route...");
-  const router = new AlphaRouter({ chainId: CHAIN_ID, provider: provider });
-  const route = await router.route(
-    CurrencyAmount.fromRawAmount(tokenFrom.token, amountIn.toString()),
-    tokenTo,
-    TradeType.EXACT_INPUT,
-    {
-      recipient: walletAddress,
-      slippageTolerance: SLIPPAGE_TOLERANCE,
-      deadline: DEADLINE,
-      type: SwapType.SWAP_ROUTER_02,
-    }
-  );
-
-  if (!route) {
-    throw new Error("No route found for the swap.");
-  }
-
-  console.log(
-    `📊 Swap Details:
-    - Input: ${ethers.utils.formatUnits(amountIn, tokenFrom.token.decimals)} ${tokenFrom.token.symbol}
-    - Output: ${route.quote.toFixed(tokenTo.decimals)} ${tokenTo.symbol}
-    - Route: ${route.route[0].tokenPath.map(t => t.symbol).join(" -> ")}`
-  );
-
-  const allowance: BigNumber = await tokenFromContract.allowance(
-    walletAddress,
-    SWAP_ROUTER_ADDRESS
-  );
-
-  console.log(`👆 Current allowance: ${ethers.utils.formatUnits(allowance, tokenFrom.token.decimals)} ${tokenFrom.token.symbol}`);
-
-  const buildSwapTransaction = (
-    walletAddress: string,
-    routerAddress: string,
-    route: SwapRoute
-  ): TransactionRequest => {
-    return {
-      data: route.methodParameters?.calldata,
-      to: routerAddress,
-      from: walletAddress,
-      value: BigNumber.from(route.methodParameters?.value),
-      gasLimit: BigNumber.from("2000000"),
-    };
-  };
-
-  const swapTransaction = buildSwapTransaction(
-    walletAddress,
-    SWAP_ROUTER_ADDRESS,
-    route
-  );
-
-  const attemptSwapTransaction = async (
-    signer: ethers.Wallet,
-    transaction: TransactionRequest
-  ) => {
-    const signerBalance = await signer.getBalance();
-    console.log(`⛽ Current ETH balance for gas: ${ethers.utils.formatEther(signerBalance)} ETH`);
-
-    if (!signerBalance.gte(transaction.gasLimit || "0")) {
-      throw new Error(`Not enough ETH to cover gas: ${transaction.gasLimit}`);
-    }
-
-    console.log("🚀 Sending swap transaction...");
-    const tx = await signer.sendTransaction(transaction);
-    console.log(`📝 Transaction sent: ${tx.hash}`);
-    
-    console.log("⏳ Waiting for confirmation...");
-    const receipt = await tx.wait();
-    console.log(`✅ Transaction confirmed! Hash: ${receipt.transactionHash}`);
-  };
-
-  if (allowance.lt(amountIn)) {
-    console.log(`🔓 Requesting ${tokenFrom.token.symbol} approval...`);
-
-    const approvalTx = await tokenFromContract
-      .connect(signer)
-      .approve(
-        SWAP_ROUTER_ADDRESS,
-        ethers.utils.parseUnits(amountIn.mul(1000).toString(), 18)
-      );
-
-    console.log("⏳ Waiting for approval transaction...");
-    await approvalTx.wait(3);
-    console.log("✅ Approval confirmed!");
-    
-    await attemptSwapTransaction(signer, swapTransaction);
-  } else {
-    console.log(
-      `✅ Sufficient ${tokenFrom.token.symbol} allowance, proceeding with swap...`
-    );
-    await attemptSwapTransaction(signer, swapTransaction);
-  }
+// Ensure tokens are not null
+if (!Token0 || !Token1) {
+  throw new Error("Tokens are not initialized");
 }
 
-// Run the main function
-console.log("🤖 Base Sniper Bot Starting...");
+const tokenFrom = Token0; // WETH (or any other token) as the input token
+const tokenFromContract = Token0.contract; // The contract instance of the input token
+const tokenTo = Token1.token; // USDC (or any other token) as the output token
+
+//Then we check if we have passed the argument in the terminal while running the bot. This means that if we have not passed the amount of WETH we want to swap with then throw error. Then we are checking if we have enough amount of the TokenFrom token or not. It must be grater than the passed argument in the terminal.
+
+if (typeof process.argv[2] === "undefined") {
+  throw new Error(`Pass in the amount of ${tokenFrom.symbol} to swap.`);
+}
+
+const walletAddress = await signer.getAddress();
+const amountIn = ethers.utils.parseUnits(process.argv[2], tokenFrom.decimals);
+const balance = await tokenFromContract.balanceOf(walletAddress);
+
+if (!(await Token0.walletHas(signer, amountIn))) {
+  throw new Error(
+    `Not enough ${tokenFrom.symbol}. Needs ${amountIn}, but balance is ${balance}.`
+  );
+}
+
+//We are using AlphaRouter here from Uniswap to swap tokens on Uniswap efficiently. Then we use this router object to create a route which takes the specific details of our swap. If no route is found then it throws error.
+
+const router = new AlphaRouter({ chainId: CHAIN_ID, provider: provider });
+const route = await router.route(
+  CurrencyAmount.fromRawAmount(tokenFrom, amountIn.toString()),
+  tokenTo,
+  TradeType.EXACT_INPUT,
+  {
+    recipient: walletAddress,
+    slippageTolerance: SLIPPAGE_TOLERANCE,
+    deadline: DEADLINE,
+    type: SwapType.SWAP_ROUTER_02,
+  }
+);
+
+if (!route) {
+  throw new Error("No route found for the swap.");
+}
+
+console.log(
+  `Swapping ${amountIn} ${tokenFrom.symbol} for ${runInContext.quote.toFixed(
+    tokenTo.decimals
+  )} ${tokenTo.symbol}.`
+);
+
+//Then we check the allowance. We are just defining here buildSwapTransaction and then also using swapTransaction to populate the buildSwapTransaction. Then we have also defined attemptSwapTransaction which sends the transaction to the network.
+
+const allowance: BigNumber = await tokenFromContract.allowance(
+  walletAddress,
+  SWAP_ROUTER_ADDRESS
+);
+
+const buildSwapTransaction = (
+  walletAddress: string,
+  routerAddress: string,
+  route: SwapRoute
+): TransactionRequest => {
+  return {
+    data: route.methodParameters?.calldata,
+    to: routerAddress,
+    from: walletAddress,
+    value: BigNumber.from(route.methodParameters?.value),
+    gasLimit: BigNumber.from("2000000"), //Set your desired gas limit here
+    // Optionally, you can specify gasPrice here if needed
+    // gasPrice: YOUR_GAS_PRICE_IN_WEI
+  };
+};
+
+const swapTransaction = buildSwapTransaction(
+  walletAddress,
+  SWAP_ROUTER_ADDRESS,
+  route
+);
+
+const attemptSwapTransaction = async (
+  signer: ethers.Wallet,
+  transation: TransactionRequest
+) => {
+  const signerBalance = await signer.getBalance();
+
+  if (!signerBalance.gte(transation.gasLimit || "0")) {
+    throw new Error(`Not enough ETH to cover gas: ${transation.gasLimit}`);
+  }
+
+  signer.sendTransaction(transation).then((tx) => {
+    tx.wait().then((receipt) => {
+      console.log("Completed swap transaction:", receipt.transactionHash);
+    });
+  });
+};
+
+//Here we finally call the before defined functions. Firstly we check if there is enough WETH allowance. And if there is not then we send an approve transaction to the network with the AmountIn amount of WETH. Then we call the attemptSwapTransaction which des the actual swap.
+
+if (allowance.lt(amountIn)) {
+  console.log(`Requesting ${tokenFrom.symbol} approval...`);
+
+  const approvalTx = await tokenFromContract
+    .connect(signer)
+    .approve(
+      SWAP_ROUTER_ADDRESS,
+      ethers.utils.parseUnits(amountIn.mul(1000).toString(), 18)
+    );
+
+  approvalTx.wait(3).then(() => {
+    attemptSwapTransaction(signer, swapTransaction);
+  });
+} else {
+  console.log(
+    `Sufficient ${tokenFrom.symbol} allowance, no need for approval.`
+  );
+  attemptSwapTransaction(signer, swapTransaction);
+}
+
 main().catch((error) => {
-  console.error("❌ Error:", error);
-  process.exitCode = 1;
+  console.error(error);
+  process.exitCode(1);
 });
